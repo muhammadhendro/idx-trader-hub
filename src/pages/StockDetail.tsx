@@ -1,12 +1,26 @@
+import { useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
+import { useLocalStorage } from '@/hooks/use-local-storage';
 import { MOCK_STOCKS, getCandleData, formatRupiah, formatVolume } from '@/data/mockStocks';
 import StockChart from '@/components/StockChart';
-import { ArrowLeft, ArrowUpRight, ArrowDownRight, TrendingUp } from 'lucide-react';
+import { ArrowLeft, ArrowUpRight, ArrowDownRight, TrendingUp, Star } from 'lucide-react';
+
+const TIMEFRAMES = [
+  { key: '15m', label: '15m', lookbackDays: 30 },
+  { key: '1H', label: '1H', lookbackDays: 90 },
+  { key: '1D', label: '1D', lookbackDays: 200 },
+] as const;
+
+type Timeframe = (typeof TIMEFRAMES)[number]['key'];
 
 export default function StockDetail() {
   const { ticker } = useParams<{ ticker: string }>();
   const stock = MOCK_STOCKS.find(s => s.ticker === ticker);
-  const candleData = getCandleData(ticker || 'BBCA');
+
+  const [timeframe, setTimeframe] = useLocalStorage<Timeframe>('idxpulse:chart:timeframe', '1D');
+  const [chartProvider, setChartProvider] = useLocalStorage<'lightweight' | 'tradingview'>('idxpulse:chart:provider', 'lightweight');
+  const selectedTimeframe = TIMEFRAMES.find(tf => tf.key === timeframe) ?? TIMEFRAMES[2];
+  const candleData = getCandleData(ticker || 'BBCA', selectedTimeframe.lookbackDays);
 
   if (!stock) {
     return (
@@ -16,6 +30,20 @@ export default function StockDetail() {
       </div>
     );
   }
+
+  const [watchlist, setWatchlist] = useLocalStorage<string[]>('idxpulse:watchlist', ['BBCA', 'BMRI', 'TLKM']);
+  const inWatchlist = watchlist.includes(stock.ticker);
+
+  const toggleWatchlist = () => {
+    setWatchlist(current =>
+      current.includes(stock.ticker)
+        ? current.filter(t => t !== stock.ticker)
+        : [stock.ticker, ...current]
+    );
+  };
+
+
+  const tvSymbol = useMemo(() => `IDX:${ticker ?? 'BBCA'}`, [ticker]);
 
   const bullish = stock.change >= 0;
 
@@ -29,6 +57,13 @@ export default function StockDetail() {
         <div>
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-bold font-mono text-foreground">{stock.ticker}</h1>
+            <button
+              onClick={toggleWatchlist}
+              className={`p-1.5 rounded-md border transition-colors ${inWatchlist ? 'bg-primary/10 border-primary text-primary' : 'bg-secondary/50 border-border text-muted-foreground hover:text-foreground'}`}
+              aria-label="Toggle watchlist"
+            >
+              <Star className="w-4 h-4" fill={inWatchlist ? 'currentColor' : 'none'} />
+            </button>
             <span className="text-sm text-muted-foreground">{stock.name}</span>
             <span className="status-badge bg-secondary text-muted-foreground border border-border">{stock.sector}</span>
           </div>
@@ -59,8 +94,57 @@ export default function StockDetail() {
         ))}
       </div>
 
+      <div className="glass-card p-3 flex items-center justify-between gap-3">
+        <p className="text-xs text-muted-foreground">Timeframe chart (simulasi data):</p>
+        <div className="flex items-center gap-2">
+          {TIMEFRAMES.map(tf => (
+            <button
+              key={tf.key}
+              onClick={() => setTimeframe(tf.key)}
+              className={`px-2.5 py-1 rounded text-xs border transition-colors ${
+                timeframe === tf.key
+                  ? 'bg-primary/10 border-primary text-primary'
+                  : 'bg-secondary/40 border-border text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              {tf.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="glass-card p-3 flex items-center justify-between gap-3">
+        <p className="text-xs text-muted-foreground">Chart provider:</p>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setChartProvider('lightweight')}
+            className={`px-2.5 py-1 rounded text-xs border ${chartProvider === 'lightweight' ? 'bg-primary/10 border-primary text-primary' : 'bg-secondary/40 border-border text-muted-foreground hover:text-foreground'}`}
+          >
+            Lightweight
+          </button>
+          <button
+            onClick={() => setChartProvider('tradingview')}
+            className={`px-2.5 py-1 rounded text-xs border ${chartProvider === 'tradingview' ? 'bg-primary/10 border-primary text-primary' : 'bg-secondary/40 border-border text-muted-foreground hover:text-foreground'}`}
+          >
+            TradingView
+          </button>
+        </div>
+      </div>
+
       {/* Chart */}
-      <StockChart data={candleData} ticker={stock.ticker} />
+      {chartProvider === 'lightweight' ? (
+        <StockChart data={candleData} ticker={`${stock.ticker} · ${selectedTimeframe.label}`} />
+      ) : (
+        <div className="glass-card p-4 space-y-2">
+          <h3 className="text-sm font-semibold text-foreground">TradingView Embed (Preview)</h3>
+          <p className="text-xs text-muted-foreground">Jika simbol tidak tersedia, gunakan mode Lightweight chart.</p>
+          <iframe
+            title="TradingView"
+            src={`https://s.tradingview.com/widgetembed/?symbol=${encodeURIComponent(tvSymbol)}&interval=D&theme=dark&style=1&withdateranges=1&hide_side_toolbar=0&allow_symbol_change=1&saveimage=0&studies=[]`}
+            className="w-full h-[520px] rounded border border-border"
+          />
+        </div>
+      )}
 
       {/* Fundamentals */}
       <div className="glass-card p-4">
