@@ -1,20 +1,54 @@
-import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { MOCK_STOCKS, IDX_SECTORS, formatVolume, type StockData } from '@/data/mockStocks';
-import { Search, Filter, ArrowUpRight, ArrowDownRight, ChevronDown } from 'lucide-react';
+import { MOCK_STOCKS, IDX_SECTORS, formatVolume, getCandleData } from '@/data/mockStocks';
+import { Search, ArrowUpRight, ArrowDownRight, Save } from 'lucide-react';
+import { useLocalStorage } from '@/hooks/use-local-storage';
+
+type SortKey = 'ticker' | 'price' | 'changePercent' | 'volume' | 'marketCap' | 'per' | 'pbv' | 'roe';
+
+type ScreenerState = {
+  search: string;
+  sectorFilter: string;
+  filters: {
+    volumeAboveMA: boolean;
+    breakoutMA50: boolean;
+    rsiAbove50: boolean;
+    perLow: boolean;
+    pbvBelow1: boolean;
+  };
+  sort: { key: SortKey; direction: 'asc' | 'desc' };
+};
+
+type ScreenerPreset = {
+  id: string;
+  name: string;
+  state: ScreenerState;
+};
+
+function getLatestMA50(ticker: string) {
+  const candles = getCandleData(ticker, 120);
+  if (candles.length < 50) return null;
+  const recent = candles.slice(-50);
+  return recent.reduce((sum, candle) => sum + candle.close, 0) / 50;
+}
 
 export default function ScreenerPage() {
-  const [search, setSearch] = useState('');
-  const [sectorFilter, setSectorFilter] = useState('');
-  const [filters, setFilters] = useState({
+  const [search, setSearch] = useLocalStorage('idxpulse:screener:search', '');
+  const [sectorFilter, setSectorFilter] = useLocalStorage('idxpulse:screener:sector', '');
+  const [filters, setFilters] = useLocalStorage('idxpulse:screener:filters', {
     volumeAboveMA: false,
     breakoutMA50: false,
     rsiAbove50: false,
     perLow: false,
     pbvBelow1: false,
   });
+  const [sort, setSort] = useLocalStorage<{ key: SortKey; direction: 'asc' | 'desc' }>('idxpulse:screener:sort', {
+    key: 'changePercent',
+    direction: 'desc',
+  });
+  const [presets, setPresets] = useLocalStorage<ScreenerPreset[]>('idxpulse:screener:presets', []);
 
   let filtered = [...MOCK_STOCKS];
+  const avgVolume = MOCK_STOCKS.reduce((sum, stock) => sum + stock.volume, 0) / MOCK_STOCKS.length;
 
   if (search) {
     const q = search.toUpperCase();
@@ -26,12 +60,105 @@ export default function ScreenerPage() {
   if (filters.perLow) filtered = filtered.filter(s => s.per > 0 && s.per < 15);
   if (filters.pbvBelow1) filtered = filtered.filter(s => s.pbv < 1);
   if (filters.rsiAbove50) filtered = filtered.filter(s => s.changePercent > 0);
-  if (filters.breakoutMA50) filtered = filtered.filter(s => s.price > s.prevClose * 1.01);
+  if (filters.breakoutMA50) filtered = filtered.filter(stock => {
+    const ma50 = getLatestMA50(stock.ticker);
+    return ma50 !== null && stock.price > ma50;
+  });
+  if (filters.volumeAboveMA) filtered = filtered.filter(s => s.volume > avgVolume);
+
+  filtered = filtered.sort((a, b) => {
+    const aValue = a[sort.key];
+    const bValue = b[sort.key];
+    if (typeof aValue === 'string' && typeof bValue === 'string') {
+      return sort.direction === 'asc'
+        ? aValue.localeCompare(bValue)
+        : bValue.localeCompare(aValue);
+    }
+
+    const diff = Number(aValue) - Number(bValue);
+    return sort.direction === 'asc' ? diff : -diff;
+  });
+
+  const toggleSort = (key: SortKey) => {
+    setSort(current => {
+      if (current.key === key) {
+        return { ...current, direction: current.direction === 'asc' ? 'desc' : 'asc' };
+      }
+      return { key, direction: 'desc' };
+    });
+  };
+
+  const resetFilters = () => {
+    setSearch('');
+    setSectorFilter('');
+    setFilters({
+      volumeAboveMA: false,
+      breakoutMA50: false,
+      rsiAbove50: false,
+      perLow: false,
+      pbvBelow1: false,
+    });
+    setSort({ key: 'changePercent', direction: 'desc' });
+  };
+
+  const savePreset = () => {
+    const name = window.prompt('Nama preset screener:');
+    if (!name) return;
+
+    const state: ScreenerState = { search, sectorFilter, filters, sort };
+    const newPreset: ScreenerPreset = {
+      id: Date.now().toString(),
+      name,
+      state,
+    };
+
+    setPresets(current => [newPreset, ...current].slice(0, 8));
+  };
+
+  const applyPreset = (preset: ScreenerPreset) => {
+    setSearch(preset.state.search);
+    setSectorFilter(preset.state.sectorFilter);
+    setFilters(preset.state.filters);
+    setSort(preset.state.sort);
+  };
+
+  const deletePreset = (id: string) => {
+    setPresets(current => current.filter(preset => preset.id !== id));
+  };
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-bold text-foreground">Screener Saham IDX</h1>
+        <span className="text-xs text-muted-foreground">{filtered.length} hasil</span>
+      </div>
+
+      <div className="glass-card p-3 space-y-3">
+        <div className="flex items-center justify-between gap-2">
+          <h3 className="text-sm font-semibold text-foreground">Preset Screener</h3>
+          <button onClick={savePreset} className="px-3 py-1.5 text-xs rounded-lg border border-border hover:bg-secondary/50 inline-flex items-center gap-1">
+            <Save className="w-3 h-3" /> Simpan Preset
+          </button>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {presets.length === 0 && <span className="text-xs text-muted-foreground">Belum ada preset tersimpan.</span>}
+          {presets.map(preset => (
+            <div key={preset.id} className="inline-flex items-center rounded-lg border border-border overflow-hidden">
+              <button
+                onClick={() => applyPreset(preset)}
+                className="px-2.5 py-1.5 text-xs bg-secondary/30 hover:bg-secondary/60"
+              >
+                {preset.name}
+              </button>
+              <button
+                onClick={() => deletePreset(preset.id)}
+                className="px-2 py-1.5 text-xs text-muted-foreground hover:text-foreground border-l border-border"
+              >
+                ×
+              </button>
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* Filters */}
@@ -62,7 +189,8 @@ export default function ScreenerPage() {
             { key: 'perLow', label: 'PER < 15' },
             { key: 'pbvBelow1', label: 'PBV < 1' },
             { key: 'rsiAbove50', label: 'Bullish today' },
-            { key: 'breakoutMA50', label: 'Breakout' },
+            { key: 'breakoutMA50', label: 'Breakout MA50' },
+            { key: 'volumeAboveMA', label: 'Volume > Rata-rata' },
           ].map(({ key, label }) => (
             <button
               key={key}
@@ -76,6 +204,12 @@ export default function ScreenerPage() {
               {label}
             </button>
           ))}
+          <button
+            onClick={resetFilters}
+            className="px-3 py-1.5 rounded-lg text-xs font-medium border bg-secondary/50 border-border text-muted-foreground hover:text-foreground"
+          >
+            Reset
+          </button>
         </div>
       </div>
 
@@ -85,8 +219,28 @@ export default function ScreenerPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border">
-                {['Ticker', 'Harga', 'Chg%', 'Volume', 'Mkt Cap', 'PER', 'PBV', 'ROE', 'Sektor'].map(h => (
-                  <th key={h} className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">{h}</th>
+                {[
+                  { key: 'ticker', label: 'Ticker', sortable: true },
+                  { key: 'price', label: 'Harga', sortable: true },
+                  { key: 'changePercent', label: 'Chg%', sortable: true },
+                  { key: 'volume', label: 'Volume', sortable: true },
+                  { key: 'marketCap', label: 'Mkt Cap', sortable: true },
+                  { key: 'per', label: 'PER', sortable: true },
+                  { key: 'pbv', label: 'PBV', sortable: true },
+                  { key: 'roe', label: 'ROE', sortable: true },
+                  { key: 'sector', label: 'Sektor', sortable: false },
+                ].map(h => (
+                  <th key={h.key} className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                    {h.sortable ? (
+                      <button
+                        onClick={() => toggleSort(h.key as SortKey)}
+                        className="inline-flex items-center gap-1 hover:text-foreground"
+                      >
+                        {h.label}
+                        {sort.key === h.key && <span>{sort.direction === 'asc' ? '↑' : '↓'}</span>}
+                      </button>
+                    ) : h.label}
+                  </th>
                 ))}
               </tr>
             </thead>

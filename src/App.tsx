@@ -9,6 +9,11 @@ import Screener from "./pages/Screener";
 import Journal from "./pages/Journal";
 import News from "./pages/News";
 import BidOffer from "./pages/BidOffer";
+import Alerts from "./pages/Alerts";
+import Risk from "./pages/Risk";
+import Auth from "./pages/Auth";
+import IdxDataHub from "./pages/IdxDataHub";
+import BrokerHub from "./pages/BrokerHub";
 import NotFound from "./pages/NotFound";
 import Layout from "./components/Layout";
 
@@ -27,6 +32,11 @@ const App = () => (
           <Route path="/journal" element={<Layout><Journal /></Layout>} />
           <Route path="/news" element={<Layout><News /></Layout>} />
           <Route path="/bid-offer" element={<Layout><BidOffer /></Layout>} />
+          <Route path="/alerts" element={<Layout><Alerts /></Layout>} />
+          <Route path="/risk" element={<Layout><Risk /></Layout>} />
+          <Route path="/auth" element={<Layout><Auth /></Layout>} />
+          <Route path="/idx-data" element={<Layout><IdxDataHub /></Layout>} />
+          <Route path="/brokers" element={<Layout><BrokerHub /></Layout>} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>

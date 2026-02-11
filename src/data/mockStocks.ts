@@ -38,6 +38,14 @@ export interface NewsItem {
   summary: string;
 }
 
+export interface PriceAlert {
+  id: string;
+  ticker: string;
+  direction: 'above' | 'below';
+  targetPrice: number;
+  createdAt: string;
+}
+
 export interface JournalEntry {
   id: string;
   ticker: string;
@@ -103,9 +111,9 @@ function generateCandleData(basePrice: number, days: number): CandleData[] {
   return data;
 }
 
-export function getCandleData(ticker: string): CandleData[] {
+export function getCandleData(ticker: string, lookbackDays: number = 200): CandleData[] {
   const stock = MOCK_STOCKS.find(s => s.ticker === ticker);
-  return generateCandleData(stock?.price ?? 5000, 200);
+  return generateCandleData(stock?.price ?? 5000, lookbackDays);
 }
 
 export const MOCK_NEWS: NewsItem[] = [
