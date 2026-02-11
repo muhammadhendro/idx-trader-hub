@@ -1,5 +1,6 @@
 import { Link, useLocation } from 'react-router-dom';
-import { BarChart3, Newspaper, BookOpen, Search, TrendingUp, Activity, Home } from 'lucide-react';
+import { useAuth } from '@/hooks/use-auth';
+import { Newspaper, BookOpen, Search, TrendingUp, Activity, Home, Bell, ShieldAlert, ShieldCheck, Database, Landmark } from 'lucide-react';
 
 const NAV_ITEMS = [
   { path: '/', label: 'Dashboard', icon: Home },
@@ -7,10 +8,16 @@ const NAV_ITEMS = [
   { path: '/journal', label: 'Journal', icon: BookOpen },
   { path: '/news', label: 'News', icon: Newspaper },
   { path: '/bid-offer', label: 'Bid-Offer', icon: Activity },
+  { path: '/alerts', label: 'Alerts', icon: Bell },
+  { path: '/risk', label: 'Risk', icon: ShieldAlert },
+  { path: '/auth', label: 'Auth', icon: ShieldCheck },
+  { path: '/idx-data', label: 'IDX Data', icon: Database },
+  { path: '/brokers', label: 'Brokers', icon: Landmark },
 ];
 
 export default function Navbar() {
   const location = useLocation();
+  const { loggedIn, user } = useAuth();
 
   return (
     <header className="h-14 border-b border-border bg-card/90 backdrop-blur-xl sticky top-0 z-50 flex items-center px-4 gap-6">
@@ -43,11 +50,14 @@ export default function Navbar() {
         })}
       </nav>
 
-      <div className="ml-auto flex items-center gap-3">
+      <div className="ml-auto flex items-center gap-4">
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <div className="pulse-dot" />
           <span className="font-mono">IHSG 7,245.82</span>
           <span className="ticker-bullish text-xs">+0.45%</span>
+        </div>
+        <div className="text-xs text-muted-foreground border border-border rounded px-2 py-1">
+          {loggedIn ? `${user.name} (${user.role})` : 'Guest mode'}
         </div>
       </div>
     </header>

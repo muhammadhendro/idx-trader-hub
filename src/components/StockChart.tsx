@@ -76,6 +76,7 @@ export default function StockChart({ data, ticker }: StockChartProps) {
   const [showMA20, setShowMA20] = useState(true);
   const [showMA50, setShowMA50] = useState(true);
   const [showMA200, setShowMA200] = useState(false);
+  const [showSR, setShowSR] = useState(true);
 
   useEffect(() => {
     if (!chartRef.current || !rsiRef.current || !macdRef.current) return;
@@ -124,6 +125,19 @@ export default function StockChart({ data, ticker }: StockChartProps) {
     if (showMA200) {
       const ma200 = chart.addSeries(LineSeries, { color: '#a855f7', lineWidth: 1, priceLineVisible: false });
       ma200.setData(calcMA(data, 200));
+    }
+
+    if (showSR && data.length > 20) {
+      const recent = data.slice(-40);
+      const resistance = Math.max(...recent.map(c => c.high));
+      const support = Math.min(...recent.map(c => c.low));
+      const srTimes = recent.map(c => c.time);
+
+      const resistanceLine = chart.addSeries(LineSeries, { color: '#ef4444', lineWidth: 1, lineStyle: 2, priceLineVisible: false });
+      resistanceLine.setData(srTimes.map(time => ({ time, value: resistance })));
+
+      const supportLine = chart.addSeries(LineSeries, { color: '#22c55e', lineWidth: 1, lineStyle: 2, priceLineVisible: false });
+      supportLine.setData(srTimes.map(time => ({ time, value: support })));
     }
 
     chart.timeScale().fitContent();
@@ -199,7 +213,7 @@ export default function StockChart({ data, ticker }: StockChartProps) {
       rsiChart.remove();
       macdChart.remove();
     };
-  }, [data, showMA20, showMA50, showMA200]);
+  }, [data, showMA20, showMA50, showMA200, showSR]);
 
   return (
     <div className="glass-card p-4 space-y-2">
@@ -210,6 +224,7 @@ export default function StockChart({ data, ticker }: StockChartProps) {
             { label: 'MA20', active: showMA20, toggle: () => setShowMA20(!showMA20), color: 'bg-warning' },
             { label: 'MA50', active: showMA50, toggle: () => setShowMA50(!showMA50), color: 'bg-primary' },
             { label: 'MA200', active: showMA200, toggle: () => setShowMA200(!showMA200), color: 'bg-purple-500' },
+            { label: 'S/R', active: showSR, toggle: () => setShowSR(!showSR), color: 'bg-rose-500' },
           ].map(({ label, active, toggle, color }) => (
             <button
               key={label}
@@ -225,6 +240,7 @@ export default function StockChart({ data, ticker }: StockChartProps) {
         </div>
       </div>
       <div ref={chartRef} />
+      <div className="text-[11px] text-muted-foreground font-mono">S/R = support/resistance dari 40 candle terakhir</div>
       <div className="flex items-center gap-2 pt-1">
         <span className="text-xs text-muted-foreground font-mono">RSI (14)</span>
       </div>

@@ -1,13 +1,14 @@
 import { useState } from 'react';
-import { MOCK_JOURNAL, type JournalEntry } from '@/data/mockStocks';
-import { BookOpen, Plus, TrendingUp, TrendingDown, Target, AlertTriangle } from 'lucide-react';
+import { MOCK_JOURNAL, MOCK_STOCKS, type JournalEntry } from '@/data/mockStocks';
+import { BookOpen, Plus } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { useLocalStorage } from '@/hooks/use-local-storage';
 
 const EMOTIONS = ['disiplin', 'FOMO', 'ragu', 'serakah'];
 const REASONS = ['Breakout MA50', 'Breakout resistance', 'RSI oversold', 'Volume spike', 'Support kuat', 'Bounce support', 'Sektor bullish', 'News catalyst'];
 
 export default function JournalPage() {
-  const [entries, setEntries] = useState<JournalEntry[]>(MOCK_JOURNAL);
+  const [entries, setEntries] = useLocalStorage<JournalEntry[]>('idxpulse:journal', MOCK_JOURNAL);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({
     ticker: '', entryPrice: '', entryDate: '', timeframe: '1D',
@@ -25,6 +26,24 @@ export default function JournalPage() {
     return acc;
   }, {} as Record<string, number>);
   const topEmotion = Object.entries(emotionCount).sort((a, b) => b[1] - a[1])[0];
+
+  const closeTrade = (entryId: string) => {
+    setEntries(current =>
+      current.map(entry => {
+        if (entry.id !== entryId || entry.status === 'closed') return entry;
+
+        const stock = MOCK_STOCKS.find(item => item.ticker === entry.ticker);
+        const exitPrice = stock?.price ?? entry.entryPrice;
+        return {
+          ...entry,
+          exitPrice,
+          exitDate: new Date().toISOString().split('T')[0],
+          pnl: exitPrice - entry.entryPrice,
+          status: 'closed' as const,
+        };
+      })
+    );
+  };
 
   const handleSubmit = () => {
     if (!form.ticker || !form.entryPrice) return;
@@ -156,7 +175,7 @@ export default function JournalPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border">
-                {['Ticker', 'Entry', 'Exit', 'P/L', 'TF', 'Emosi', 'R:R', 'Status'].map(h => (
+                {['Ticker', 'Entry', 'Exit', 'P/L', 'TF', 'Emosi', 'R:R', 'Status', 'Aksi'].map(h => (
                   <th key={h} className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">{h}</th>
                 ))}
               </tr>
@@ -186,6 +205,18 @@ export default function JournalPage() {
                     <span className={`status-badge border ${
                       e.status === 'open' ? 'bg-primary/10 text-primary border-primary' : 'bg-secondary text-muted-foreground border-border'
                     }`}>{e.status}</span>
+                  </td>
+                  <td className="px-4 py-3">
+                    {e.status === 'open' ? (
+                      <button
+                        onClick={() => closeTrade(e.id)}
+                        className="px-2 py-1 rounded-md text-xs border border-primary/40 text-primary hover:bg-primary/10 transition-colors"
+                      >
+                        Tutup posisi
+                      </button>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">—</span>
+                    )}
                   </td>
                 </tr>
               ))}
