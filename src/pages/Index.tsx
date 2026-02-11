@@ -8,7 +8,7 @@ import { ArrowUpRight, ArrowDownRight, BarChart3, Search, Star } from 'lucide-re
 import { useLocalStorage } from '@/hooks/use-local-storage';
 
 const Index = () => {
-  const { stocks: liveStocks, lastUpdated } = useMarketFeed();
+  const { stocks: liveStocks, lastUpdated, source } = useMarketFeed();
   const marketStocks = liveStocks.length > 0 ? liveStocks : MOCK_STOCKS;
   const totalVolume = marketStocks.reduce((s, st) => s + st.volume, 0);
   const avgChange = marketStocks.reduce((s, st) => s + st.changePercent, 0) / marketStocks.length;
@@ -63,7 +63,7 @@ const Index = () => {
           </div>
         </div>
 
-        <p className="text-[11px] text-muted-foreground">Update simulasi market: {new Date(lastUpdated).toLocaleTimeString('id-ID')}</p>
+        <p className="text-[11px] text-muted-foreground">Update market ({source === 'api-yahoo' ? 'Yahoo API' : source === 'api-stooq' ? 'Stooq API' : 'simulasi fallback'}): {new Date(lastUpdated).toLocaleTimeString('id-ID')}</p>
 
         {/* Quick Actions */}
         <div className="flex gap-2">

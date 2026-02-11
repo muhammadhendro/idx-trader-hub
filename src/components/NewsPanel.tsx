@@ -26,7 +26,7 @@ export default function NewsPanel({
   sentiment?: 'all' | SentimentType;
   ticker?: string;
 }) {
-  const { news } = useMarketFeed();
+  const { news, source, lastUpdated } = useMarketFeed();
   const normalizedQuery = (query ?? '').trim().toLowerCase();
 
   const dedupedNews = useMemo(() => {
@@ -72,6 +72,7 @@ export default function NewsPanel({
       <div className="flex items-center gap-2">
         <Newspaper className="w-4 h-4 text-primary" />
         <h3 className="text-sm font-semibold text-foreground">News & Sentiment</h3>
+        <span className="text-[10px] text-muted-foreground">{source === 'api-yahoo' ? 'Yahoo API + simulasi news' : source === 'api-stooq' ? 'Stooq API + simulasi news' : 'simulasi'} · {new Date(lastUpdated).toLocaleTimeString('id-ID')}</span>
       </div>
 
       {tickerImpact.length > 0 && (
